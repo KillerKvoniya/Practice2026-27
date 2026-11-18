@@ -1,0 +1,94 @@
+from PySide6.QtWidgets import *
+import psycopg2
+
+def db(query, *args):
+    conn = psycopg2.connect(
+    dbname = 'Printing_service',
+    user = 'postgres',
+    password = '12345',
+    host = 'localhost',
+    port = '5432'
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query, args)
+            if not cur.description:
+                return []
+            else:
+                return cur.fetchall()
+    finally:
+        conn.close()
+
+# =========================================================================================
+
+app = QApplication([])
+
+windowFA = QWidget()
+textFA = QLabel('Форма авторизации')
+login = QLineEdit()
+login.setPlaceholderText('login')
+password = QLineEdit()
+password.setEchoMode(QLineEdit.EchoMode.Password)
+password.setPlaceholderText('password')
+errorFA = QLabel()
+buttonFA_send = QPushButton('Отправить')
+buttonFA_clear = QPushButton('Очистить')
+
+# =========================================================================================
+
+layoutFA = QVBoxLayout(windowFA)
+layoutFA.addWidget(textFA)
+layoutFA.addWidget(login)
+layoutFA.addWidget(password)
+layoutFA.addWidget(errorFA)
+layoutFA.addWidget(buttonFA_send)
+layoutFA.addWidget(buttonFA_clear)
+
+# =========================================================================================
+
+def find_user(login, password):
+    if not login or not password:
+        return None
+
+    found = db('SELECT * FROM customers WHERE login = %s AND customer_password = %s', login, password)
+
+    if not found:
+        return None
+    else:
+        return found[0]
+
+# =========================================================================================
+
+def click_send():
+    lt = login.text().strip()
+    pt = password.text().strip()
+    if not lt or not pt:
+        errorFA.setText('Заполните все поля')
+    else:
+        try:
+            user = find_user(lt, pt)
+        except Exception as e:
+            errorFA.setText(f'Ошибка БД: {e}')
+            return
+
+        if user is None:
+            errorFA.setText('Я тебя не узнаю')
+        elif user[4] == 'operator':
+            errorFA.setText('Вы успешно авторизовались')
+        else:
+            errorFA.setText('Вы успешно не авторизовались')
+
+# =========================================================================================
+
+def click_clear():
+    errorFA.clear()
+    login.clear()
+    password.clear()
+
+# =========================================================================================
+
+buttonFA_send.clicked.connect(click_send)
+buttonFA_clear.clicked.connect(click_clear)
+windowFA.show()
+app.exec()
